@@ -1,0 +1,73 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:android)
+
+platform :android do
+  before_all do
+  #all the global variables
+  ENV["SLACK_URL"]
+  end
+
+  desc "Runs all the tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Upload AAB to slack channel"
+    private_lane :upload_to_slack do |options|
+     file_path = lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH ]
+     file_name = file_path.gsub(/\/.*\//,"")
+     access_token = ENV["ACCESS_TOKEN"]
+     channel_name = "android-kotjava"
+    sh "echo Uploading " + file_name + " to Slack"
+    sh "curl https://slack.com/api/files.upload -F token=\"" + access_token + "\" -F channels=\"" + channel_name + "\" -F title=\"" + file_name + "\" -F filename=\"" + file_name + "\" -F file=@" + file_path
+  end
+
+  desc "Make production release"
+        lane :build_production_release do
+        gradle(
+          task: "bundle",
+          build_type: "Release",
+          print_command: false,
+          properties: {
+            "android.injected.signing.store.file" => ENV['KEYSTORE_PATH'],
+            "android.injected.signing.store.password" => ENV['STORE_PASSWORD'],
+            "android.injected.signing.key.alias" => ENV['KEY_ALIAS'],
+            "android.injected.signing.key.password" => ENV['KEY_PASSWORD'],
+          }
+        )
+  end
+
+  desc "Upload production apk to slack"
+      lane :upload_production_apk_slack do
+
+        build_production_release
+
+        upload_to_slack
+
+        slack(message: ":rocket: *Build Successful!* :rocket:")
+  end
+
+  desc "Upload staging apk to slack"
+      lane :upload_staging_apk_slack do
+
+        build_staging_release
+
+        upload_to_slack
+
+        slack(message: ":rocket: *Build Successful!* :rocket:")
+  end
+end

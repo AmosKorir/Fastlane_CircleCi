@@ -1,0 +1,2 @@
+rootProject.name='Fastlane_CIrcle_Ci'
+include ':app'
